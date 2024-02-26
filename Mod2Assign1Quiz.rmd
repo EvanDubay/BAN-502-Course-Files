@@ -1,0 +1,70 @@
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(GGally)
+library(lmtest)
+library(ggcorrplot)
+library(gridExtra)
+
+air = airquality
+```
+
+Question 1 - 153
+Question 2 - 6
+Question 3 - True
+Question 4 - D Temp
+
+Question 5 - 111
+Question 6 - 6
+```{r}
+air2 = air %>% drop_na()
+```
+
+Question 7 - Temperature
+Question 8 - Day
+```{r}
+ggpairs(air2)
+ggcorr(air2, label = TRUE)
+```
+
+Question 9 - C As Temp Increases, Ozone Increases
+```{r}
+ggplot(air2, aes(x = Temp, y = Ozone)) +
+  geom_point() +
+  labs(title = "Plot of Temp vs Ozone",
+       x = "Temperature",
+       y = "Ozone")
+```
+
+Question 10 - 2.4391
+Question 11 - 0.488
+Question 12 - Yes
+Question 13 - True
+
+```{r}
+TempOzone = recipe(Ozone ~ Temp, air2)
+TempOzone
+
+lm_model = 
+  linear_reg() %>%
+  set_engine("lm")
+
+lm_wflow =
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(TempOzone)
+
+lm_fit = fit(lm_wflow, air2)
+
+summary(lm_fit$fit$fit$fit)
+
+confint(lm_fit$fit$fit$fit)
+```
+
+Question 14 - 47.48
+Question 15 - False
+
+```{r}
+
+```
+

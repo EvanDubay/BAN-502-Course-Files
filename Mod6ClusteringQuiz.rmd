@@ -1,0 +1,71 @@
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(cluster)
+library(factoextra)
+library(dendextend)
+
+trucks <- read_csv("trucks-1.csv")
+
+str(trucks)
+summary(trucks)
+```
+
+```{r}
+trucks_clean = trucks %>% select(-Driver_ID) %>%
+  drop_na() #row-wise deletion of missingness
+str(trucks_clean)
+summary(trucks_clean)
+```
+
+```{r}
+trucks_scaled = scale(trucks_clean) 
+summary(trucks_scaled)
+
+```
+
+```{r}
+points = trucks_clean %>% dplyr::select(Distance, Speeding)
+
+ggplot(points, aes(x=Distance, y=Speeding)) +
+  geom_point(alpha = 0.4) + theme_bw()
+
+set.seed(64)
+kclust = kmeans(trucks_scaled, centers = 2) #run k-means clustering with k = 3
+kclust #view results
+
+points = augment(kclust, points)
+points
+
+set.seed(412)
+clusts = 
+  tibble(k = 1:8) %>% #try from 1 to 10 clusters
+  mutate(
+    kclust = map(k, ~kmeans(points, .x)),
+    tidied = map(kclust, tidy),
+    glanced = map(kclust, glance),
+    augmented = map(kclust, augment, points)
+  )
+
+clusts
+
+clusters =
+  clusts %>%
+  unnest(cols = c(tidied))
+
+assignments = 
+  clusts %>% 
+  unnest(cols = c(augmented))
+
+clusterings = 
+  clusts %>%
+  unnest(cols = c(glanced))
+
+ggplot(clusterings, aes(k, tot.withinss)) +
+  geom_line() +
+  geom_point() + theme_bw()
+
+cust_clust = kmeans(trucks_scaled, centers = 2) #run k-means clustering with k = 4
+cust_clust #view results
+```
+

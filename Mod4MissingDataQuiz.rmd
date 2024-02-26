@@ -1,0 +1,75 @@
+Libraries and Data Import
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(mice)
+library(VIM)
+library(naniar)
+library(skimr)
+library(UpSetR)
+
+grades <- read_csv("class-grades.csv")
+
+grades = grades %>% mutate(Final = as_factor(Final))
+grades = grades %>% mutate(Prefix = as_factor(Prefix))
+grades = grades %>% mutate(Assignment = as_factor(Assignment))
+grades = grades %>% mutate(Midterm = as_factor(Midterm))
+grades = grades %>% mutate(TakeHome = as_factor(TakeHome))
+grades = grades %>% mutate(Tutorial = as_factor(Tutorial))
+
+```
+
+Task 1 - Tutorial, Midterm, TakeHome, Final
+```{r}
+gg_miss_var(grades)
+
+str(grades)
+summary(grades)
+skim(grades)
+```
+
+Task 2 - Yes
+```{r}
+gg_miss_case(grades)
+```
+
+Task 3 - 89
+```{r}
+grades_rowdel = grades %>% drop_na() 
+#alternatively can specify which variable(s) on which to do the drop_na
+#drop_na(Age)
+skim(grades_rowdel)
+```
+
+Task 4 - 2
+```{r}
+grades_coldel = grades %>% drop_na() 
+vim_plot = aggr(titanic_coldel, numbers = TRUE, prop = c(TRUE, FALSE),cex.axis=.7)
+skim(titanic_coldel)
+```
+
+Task 5 - Task 3, deleting the rows is the the most preferable. Deleting all of the columns would delete a majority of the data in the data set. Deleting just the rows with missing data would leave a majority of it intact. 
+
+task 6 - 0
+```{r}
+set.seed(123) #sets seed for random number generator
+imp_grade = mice(grades, m=5, method='pmm', printFlag=FALSE)
+#m is the number of imputations, 5 is a reasonable value as a default
+#pmm is "predictive mean matching" = imputation method for numeric data
+#printFlag reduces amount of output
+
+summary(imp_grade)
+
+```
+```{r}
+densityplot(imp_grade, ~ Final)
+
+grades_complete <- complete(imp_grade)
+summary(grades_complete)
+str(grades_complete)
+skim(grades_complete)
+
+mean(as.numeric(as.character(grades_complete$Final)), na.rm = TRUE)
+
+```
+

@@ -1,0 +1,53 @@
+```{r}
+library(tidyverse)
+library(lubridate)
+library(tidymodels)
+
+bike <- read_csv("bike_cleaned-4.csv")
+bike = bike %>% mutate(dteday = mdy(dteday))
+bike = bike %>% mutate_if(is.character, as_factor)
+bike = bike %>% mutate(hr = as_factor(hr))
+
+```
+
+Question 1 - 12,163
+
+```{r}
+set.seed(1234)
+bike_split = initial_split(bike, prop = 0.70, strata = count)
+train = training(bike_split)
+test = testing(bike_split)
+```
+
+Question 2 - B ensures count is similarly represented in both data sets.
+
+Question 3 - 0.6209
+
+```{r}
+bike_recipe = recipe(count ~ season + mnth + hr + holiday + weekday + temp + weathersit, train)
+
+lm_model = #give the model type a name 
+  linear_reg() %>% #specify that we are doing linear regression
+  set_engine("lm") #specify the specify type of linear tool we want to use 
+
+lm_wflow = 
+  workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(bike_recipe)
+
+lm_fit = fit(lm_wflow, train)
+
+summary(lm_fit$fit$fit$fit)
+```
+
+Question 4
+Question 5 - 0.6271 
+
+```{r}
+predict_train <- lm_fit %>% predict(test) %>% bind_cols(test) %>% metrics(truth = count, estimate = .pred)
+
+ggplot(train, aes(x = .estimate, y = count)) +
+  geom_histogram()
+
+```
+

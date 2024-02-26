@@ -1,0 +1,167 @@
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(glmnet)
+library(yardstick)
+library(e1071)
+library(ROCR)
+
+parole <- read_csv("parole.csv")
+
+parole <- parole %>%
+  mutate(
+    state = as_factor(case_when(
+      state == 1 ~ "Other",
+      state == 2 ~ "Kentucky",
+      state == 3 ~ "Louisiana",
+      state == 4 ~ "Virginia"
+    )),
+    race = as_factor(case_when(
+      race == 1 ~ "White",
+      race == 2 ~ "Other"
+    )),
+    crime = as_factor(case_when(
+      crime == 1 ~ "Other",
+      crime == 2 ~ "Larceny",
+      crime == 3 ~ "Drug-related",
+      crime == 4 ~ "Driving-related"
+    )),
+    male = as_factor(case_when(
+      male == 1 ~ "Male",
+      male == 0 ~ "Female"
+    )),
+    multiple.offenses = as_factor(case_when(
+      multiple.offenses == 1 ~ "Yes",
+      multiple.offenses == 0 ~ "No"
+    )),
+    violator = as.logical(violator),
+    violator = ifelse(violator == TRUE, "Yes",
+                      ifelse(violator == FALSE, "No", NA)))
+
+summary(parole)
+```
+
+Question 1 - 78
+Question 2 - No answer
+
+```{r}
+set.seed(12345)
+parole_split = initial_split(parole, prop = 0.70, strata = violator)
+train = training(parole_split)
+test = testing(parole_split)
+
+levels(train$violator)
+
+train = train %>% mutate(violator = fct_relevel(violator, c("No","Yes")))
+levels(train$violator)
+
+
+```
+
+Question 3 - True
+Question 4 - True
+Question 5 - True
+
+```{r}
+ggplot(parole, aes(x=male, fill = violator)) + geom_bar() + theme_bw()
+ggplot(parole, aes(x=state, fill = violator)) + geom_bar() + theme_bw()
+ggplot(parole, aes(x=max.sentence, fill = violator)) + geom_bar() + theme_bw()
+
+```
+
+Question 6 - Kentucky
+Question 7 - 390.89
+```{r}
+parole_recipe = recipe(violator ~ state, train) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+lm_model = #give the model type a name 
+  logistic_reg() %>% #specify that we are doing linear regression
+  set_engine("glm") #specify the specify type of linear tool we want to use 
+
+lm_wflow = 
+  workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(parole_recipe)
+
+lm_fit = fit(lm_wflow, train)
+
+summary(lm_fit$fit$fit$fit)
+```
+Question 8 - Multiple.offenses and state
+
+```{r}
+parole_recipe = recipe(violator ~ state + multiple.offenses + race, train) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+lm_model = #give the model type a name 
+  logistic_reg() %>% #specify that we are doing linear regression
+  set_engine("glm") #specify the specify type of linear tool we want to use 
+
+lm_wflow = 
+  workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(parole_recipe)
+
+lm_fit2 = fit(lm_wflow, train)
+
+summary(lm_fit2$fit$fit$fit)
+```
+Question 9 - .44
+
+```{r}
+newdata = data.frame(state = "Louisiana", multiple.offenses = "Yes", race = "White")
+predict(lm_fit2, newdata, type="prob")
+```
+
+Question 10 - .1471
+
+
+```{r}
+predictions = predict(lm_fit2, train, type="prob") #develop predicted probabilities
+head(predictions)
+
+predictions = predict(lm_fit2, train, type="prob")[2]
+head(predictions)
+
+ROCRpred = prediction(predictions, train$violator)
+
+###You shouldn't need to ever change the next two lines:
+ROCRperf = performance(ROCRpred, "tpr", "fpr")
+plot(ROCRperf, colorize=TRUE, print.cutoffs.at=seq(0,1,by=0.1), text.adj=c(-0.2,1.7))
+
+as.numeric(performance(ROCRpred, "auc")@y.values)
+
+opt.cut = function(perf, pred){
+    cut.ind = mapply(FUN=function(x, y, p){
+        d = (x - 0)^2 + (y-1)^2
+        ind = which(d == min(d))
+        c(sensitivity = y[[ind]], specificity = 1-x[[ind]], 
+            cutoff = p[[ind]])
+    }, perf@x.values, perf@y.values, pred@cutoffs)
+}
+print(opt.cut(ROCRperf, ROCRpred))
+```
+
+Question 11 Accuracy - 0.587
+
+```{r}
+t1 = table(train$violator,predictions > 0.2016)
+t1
+
+(t1[1,1]+t1[2,2])/nrow(parole)
+```
+
+
+Question 12 Sensitivity - 0.7179487
+
+```{r}
+36/(18+36)
+
+```
+
+
+Question 13 - B 
+
+
+Question 14

@@ -1,0 +1,116 @@
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(glmnet)
+library(GGally)
+library(ggcorrplot)
+library(MASS)
+library(lmtest)
+library(splines)
+library(leaps)
+library(car)
+library(lubridate)
+
+bike <- read_csv("bike_cleaned-3.csv")
+bike = bike %>% mutate(dteday = mdy(dteday))
+bike = bike %>% mutate_if(is.character, as_factor)
+bike = bike %>% mutate(hr = as_factor(hr))
+```
+Question 1 - Temp
+
+```{r}
+ggcorr(bike, label = "TRUE",label_round = 3)
+```
+
+Question 2 - Summer
+
+```{r}
+bike %>%
+  group_by(season) %>%
+  summarise(total_count = sum(count))
+```
+
+Question 3 - 23 dummy variables
+Question 4 - Hour 0
+Question 5 - Hour 17
+
+```{r}
+bike_recipe = recipe(count ~ hr, bike)
+
+lm_model = 
+  linear_reg() %>%
+  set_engine("lm")
+
+lm_workflow = 
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(bike_recipe)
+
+lm_fit = fit(lm_workflow, bike)
+
+summary(lm_fit$fit$fit$fit)
+
+```
+
+Question 6 - As temp increases, count appears to generally increase
+
+```{r}
+ggplot(bike, aes(x = temp, y = count)) +
+  geom_point(alpha = 0.1) +
+  theme_minimal() +
+  labs(title = "Temperature vs. Count of Rides",
+       x = "Temperature",
+       y = "Count of Rides")
+```
+Question 7 - 31.748
+Question 8 - .5886
+
+```{r}
+bike_recipe = recipe(count ~ hr + temp, bike)
+
+lm_model = 
+  linear_reg() %>%
+  set_engine("lm")
+
+lm_workflow = 
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(bike_recipe)
+
+lm_fit2 = fit(lm_workflow, bike)
+
+summary(lm_fit2$fit$fit$fit)
+```
+
+Question 9 - .1638
+Question 10 - temp only
+Question 11 - Multicollinearity
+
+```{r}
+bike_recipe = recipe(count ~ atemp + temp, bike)
+
+lm_model = 
+  linear_reg() %>%
+  set_engine("lm")
+
+lm_workflow = 
+  workflow() %>%
+  add_model(lm_model) %>%
+  add_recipe(bike_recipe)
+
+lm_fit3 = fit(lm_workflow, bike)
+
+summary(lm_fit3$fit$fit$fit)
+```
+
+Question 12 - Weekday and holiday
+
+Question 13 - Windspeed
+
+```{r}
+allmod = lm(count ~ windspeed + workingday + hum + holiday,bike)
+
+backmod = stepAIC(allmod, direction = "backward", trace = TRUE)
+summary(backmod)
+```
+

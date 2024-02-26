@@ -1,0 +1,195 @@
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(mice)
+library(VIM)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(caret)
+library(ROCR)
+
+heart <- read_csv("heart_disease-1.csv")
+
+heart <- heart %>%
+  mutate(Sex = as_factor(Sex),
+         ChestPainType = as_factor(ChestPainType),
+         RestingECG = as_factor(RestingECG),
+         ExerciseAngina = as_factor(ExerciseAngina),
+         ST_Slope = as_factor(ST_Slope),
+         HeartDisease = as_factor(HeartDisease)) %>%
+  mutate(HeartDisease = fct_recode(HeartDisease, "No" = "0", "Yes" = "1"))
+
+```
+
+Question 1 - 642
+```{r}
+set.seed(12345)
+heart_split <- initial_split(heart, prop = 0.7, strata = HeartDisease)
+train <- training(heart_split)
+test <- testing(heart_split)
+```
+
+Question 2 - B ST Slope
+Question 3 - .01
+```{r}
+heart_recipe <- recipe(HeartDisease ~ ., data = train)
+
+tree_model <- decision_tree() %>%
+  set_engine("rpart", model = TRUE) %>%
+  set_mode("classification")
+
+heart_wflow <- 
+  workflow() %>%
+  add_model(tree_model) %>%
+  add_recipe(heart_recipe)
+
+heart_fit <- fit(heart_wflow, data = train)
+
+tree <- heart_fit %>% 
+  pull_workflow_fit() %>% 
+  pluck("fit")
+
+rpart.plot(tree)
+
+heart_fit$fit$fit$fit$cptable
+```
+Question 4 - .78
+
+```{r}
+set.seed(123)
+folds <- vfold_cv(train, v = 5)
+
+heart_recipe <- recipe(HeartDisease ~ ., data = train) %>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+tree_model <- decision_tree(cost_complexity = tune()) %>%
+  set_engine("rpart", model = TRUE) %>%
+  set_mode("classification")
+
+tree_grid <- grid_regular(cost_complexity(), levels = 25)
+
+heart_wflow <- workflow() %>%
+  add_model(tree_model) %>%
+  add_recipe(heart_recipe)
+
+tree_res <- heart_wflow %>%
+  tune_grid(
+  resamples = folds,
+  grid = tree_grid
+)
+
+tree_res %>%
+  collect_metrics() %>%
+  ggplot(aes(x = cost_complexity, y = mean)) +
+  geom_line(size = 1.5, alpha = 0.6) +
+  geom_point(size = 2) +
+  facet_wrap(~ .metric, scales = "free", nrow = 2)
+```
+Question 5 - .0075
+
+```{r}
+best_tree <- tree_res %>%
+  select_best(metric = "accuracy")
+
+best_tree
+```
+Question 6 - Has Heart Disease
+
+```{r}
+final_wf <- heart_wflow %>%
+  finalize_workflow(best_tree)
+final_fit=fit(final_wf,train)
+
+tree <- final_fit %>%
+  pull_workflow_fit() %>%
+  pluck("fit")
+
+fancyRpartPlot(tree, tweak = 1.5)
+```
+Question 7 - .0075
+```{r}
+tree <- tree_res %>%
+  select_best(metric = "accuracy")
+
+tree
+```
+
+
+Question 8 - 0.8986
+Question 9 - .8692
+Question 10
+
+```{r}
+predictions <- predict(final_fit, train, type = "prob")$.pred_Yes
+
+# Step 2: Threshold Selection and ROC Curve
+# Assuming 'HeartDisease' is your binary outcome in the training dataset
+ROCRpred <- prediction(predictions, train$HeartDisease)
+
+# Plot ROC Curve to visualize TPR vs. FPR and select an optimal threshold
+ROCRperf <- performance(ROCRpred, "tpr", "fpr")
+plot(ROCRperf, colorize = TRUE, print.cutoffs.at = seq(0, 1, by = 0.1), text.adj = c(-0.2, 1.7))
+
+# Step 3: Area Under the Curve (AUC) - Measure of model strength
+auc_value <- as.numeric(performance(ROCRpred, "auc")@y.values)
+cat("AUC:", auc_value, "\n")
+
+# Step 4: Determine Optimal Threshold to balance sensitivity and specificity
+opt.cut <- function(perf, pred) {
+    cut.ind <- mapply(FUN = function(x, y, p) {
+        d <- (x - 0)^2 + (y - 1)^2
+        ind <- which(d == min(d))
+        c(sensitivity = y[[ind]], specificity = 1 - x[[ind]], cutoff = p[[ind]])
+    }, perf@x.values, perf@y.values, pred@cutoffs)
+}
+optimal_threshold <- opt.cut(ROCRperf, ROCRpred)
+print(optimal_threshold)
+
+# Step 5: Test Thresholds to Evaluate Accuracy using the Optimal Threshold
+# Convert predicted probabilities to binary classification based on optimal threshold
+optimal_cutoff <- as.numeric(optimal_threshold["cutoff"])
+t1 <- table(train$HeartDisease, predictions > 0.7391304)
+print(t1)
+
+(t1[1,1]+t1[2,2])/nrow(train)
+
+```
+Question 10 - .7717
+
+```{r}
+predictions <- predict(final_fit, test, type = "prob")$.pred_Yes
+
+# Step 2: Threshold Selection and ROC Curve
+# Assuming 'HeartDisease' is your binary outcome in the training dataset
+ROCRpred <- prediction(predictions, test$HeartDisease)
+
+# Plot ROC Curve to visualize TPR vs. FPR and select an optimal threshold
+ROCRperf <- performance(ROCRpred, "tpr", "fpr")
+plot(ROCRperf, colorize = TRUE, print.cutoffs.at = seq(0, 1, by = 0.1), text.adj = c(-0.2, 1.7))
+
+# Step 3: Area Under the Curve (AUC) - Measure of model strength
+auc_value <- as.numeric(performance(ROCRpred, "auc")@y.values)
+cat("AUC:", auc_value, "\n")
+
+# Step 4: Determine Optimal Threshold to balance sensitivity and specificity
+opt.cut <- function(perf, pred) {
+    cut.ind <- mapply(FUN = function(x, y, p) {
+        d <- (x - 0)^2 + (y - 1)^2
+        ind <- which(d == min(d))
+        c(sensitivity = y[[ind]], specificity = 1 - x[[ind]], cutoff = p[[ind]])
+    }, perf@x.values, perf@y.values, pred@cutoffs)
+}
+optimal_threshold <- opt.cut(ROCRperf, ROCRpred)
+print(optimal_threshold)
+
+# Step 5: Test Thresholds to Evaluate Accuracy using the Optimal Threshold
+# Convert predicted probabilities to binary classification based on optimal threshold
+optimal_cutoff <- as.numeric(optimal_threshold["cutoff"])
+t1 <- table(test$HeartDisease, predictions > 0.8848504)
+print(t1)
+
+(t1[1,1]+t1[2,2])/nrow(test)
+```
+
